@@ -31,11 +31,15 @@ eval_button_b_label = "👉 B est meilleure"
 eval_button_tie_label = "🤝 Match nul"
 eval_button_both_bad_label = "👎 Aucune des deux"
 
+error_message = "Une erreur s'est produite lors de la génération des réponses.\nMerci de réitérer votre question ultérieurement 🤗"
+
+logger = st.logger.get_logger(__name__)
+
 
 def save_eval(eval: str):
     """
     Saves user evaluation and query execution details to MongoDB and updates session state.
-    
+
     Args:
         eval (str): Evaluation result ('A', 'B', 'TIE', or 'BOTH_BAD')
     """
@@ -97,51 +101,60 @@ user_input = st.chat_input(chat_input_label)
 if user_input:
     rag_pipelines = [KgRagPipeline(), TextRagPipeline()]
     random.shuffle(rag_pipelines)
-    response_a = rag_pipelines[0].generate(user_input)
-    response_b = rag_pipelines[1].generate(user_input)
 
-    st.session_state.query_execution = {
-        "query": user_input,
-        "pipeline_a": rag_pipelines[0].name,
-        "pipeline_b": rag_pipelines[1].name,
-        "response_a": response_a,
-        "response_b": response_b,
-        "eval": None,
-        "timestamp": datetime.now(),
-    }
+    try:
+        response_a = rag_pipelines[0].generate(user_input)
+        response_b = rag_pipelines[1].generate(user_input)
 
-    # Display chat messages
-    left_column, right_column = st.columns(2, gap="small")
+        st.session_state.query_execution = {
+            "query": user_input,
+            "pipeline_a": rag_pipelines[0].name,
+            "pipeline_b": rag_pipelines[1].name,
+            "response_a": response_a,
+            "response_b": response_b,
+            "eval": None,
+            "timestamp": datetime.now(),
+        }
 
-    with left_column:
-        with st.container(border=True):
-            st.text(answer_a_label)
-            with st.chat_message("user"):
-                st.write(user_input)
-            with st.chat_message("assistant"):
-                st.write(response_a["answer"])
+        # Display chat messages
+        left_column, right_column = st.columns(2, gap="small")
 
-    with right_column:
-        with st.container(border=True):
-            st.text(answer_b_label)
-            with st.chat_message("user"):
-                st.write(user_input)
-            with st.chat_message("assistant"):
-                st.write(response_b["answer"])
+        with left_column:
+            with st.container(border=True):
+                st.text(answer_a_label)
+                with st.chat_message("user"):
+                    st.write(user_input)
+                with st.chat_message("assistant"):
+                    st.write(response_a["answer"])
 
-    # Display evaluation buttons
-    col1, col2, col3, col4 = st.columns(4, vertical_alignment="center")
-    with col1:
-        st.button(eval_button_a_label, use_container_width=True, on_click=save_eval_a)
-    with col2:
-        st.button(eval_button_b_label, use_container_width=True, on_click=save_eval_b)
-    with col3:
-        st.button(
-            eval_button_tie_label, use_container_width=True, on_click=save_eval_tie
-        )
-    with col4:
-        st.button(
-            eval_button_both_bad_label,
-            use_container_width=True,
-            on_click=save_eval_both_bad,
-        )
+        with right_column:
+            with st.container(border=True):
+                st.text(answer_b_label)
+                with st.chat_message("user"):
+                    st.write(user_input)
+                with st.chat_message("assistant"):
+                    st.write(response_b["answer"])
+
+        # Display evaluation buttons
+        col1, col2, col3, col4 = st.columns(4, vertical_alignment="center")
+        with col1:
+            st.button(
+                eval_button_a_label, use_container_width=True, on_click=save_eval_a
+            )
+        with col2:
+            st.button(
+                eval_button_b_label, use_container_width=True, on_click=save_eval_b
+            )
+        with col3:
+            st.button(
+                eval_button_tie_label, use_container_width=True, on_click=save_eval_tie
+            )
+        with col4:
+            st.button(
+                eval_button_both_bad_label,
+                use_container_width=True,
+                on_click=save_eval_both_bad,
+            )
+    except Exception as e:
+        st.error(error_message)
+        logger.error(f"Error {str(e)} [User Input:{user_input}]")
